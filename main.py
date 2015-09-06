@@ -10,6 +10,7 @@ if __name__ == "__main__":
     When app is locked another instance can not start
     """
     get_lock(APP_NAME)
+    custom_logger.log("======================================")
     custom_logger.log("Start logic")
     run_logic()
     custom_logger.log("End logic")

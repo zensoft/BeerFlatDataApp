@@ -1,4 +1,5 @@
 from utils.custom_logger import *
+from core.beers_flat_manager import *
 import os, time
 
 custom_logger = CustomLogger()
@@ -7,4 +8,5 @@ custom_logger = CustomLogger()
 Main method that run logic
 """
 def run_logic():
-    time.sleep(10)
+    beersFlatManager = BeersFlatManager()
+    beersFlatManager.update_flat()
