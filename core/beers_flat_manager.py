@@ -1,4 +1,5 @@
 import psycopg2
+import time
 from settings.db_settings import *
 from utils.custom_logger import *
 from utils.db_utils import *
@@ -8,23 +9,51 @@ custom_logger = CustomLogger()
 class BeersFlatManager:
 
     def update_flat(self):
+        start = time.time()
         conn = self._get_db_connection()
         if not type(conn) == str:
-            if self._is_flat_empty(conn):
-                #add all record from table app_brewery
-                brewerys = self._get_all_brewerys(conn)
-                for brewery in brewerys:
-                    self._proccess_brewery(conn, brewery["brewery_name"])
-            else:
-                #add and update only newest records from app_brewery
-                #TODO
-                pass
+            self._clear_flat(conn)
+            self._reload_flat_data(conn)
             conn.close()
         else:
             custom_logger.log(conn)
+        end = time.time()
+        custom_logger.log("Execution time in seconds: {0}".format(end - start))
+
+    def _reload_flat_data(self, conn):
+        cursor = conn.cursor()
+        get_reload_flat_data_sql = """
+            INSERT INTO app_beers_flat
+            (brewery_name, descriptiion, www, picture, address_name,
+            address_lat, address_lon, city, province, updated_at)
+             (
+        		SELECT b.brewery_name as bname, b.brewery_description as bdesc,
+        		b.www as www, b.picture_path as bpicture,
+        		a.address_name as aname, a.lat as lat, a.lon as lon,
+        		c.city_name as cname, p.province_name as pname, b.updated_at as updated_at
+        		FROM app_brewery b
+        		LEFT JOIN app_address a on a.address_id = b.address_id
+        		LEFT JOIN app_city c on c.city_id = a.city_id
+        		LEFT JOIN app_province p on p.province_id = c.province_id
+        		WHERE b.brewery_name in (select brewery_name from app_brewery where published)
+        	)
+                                    """
+        cursor.execute(get_reload_flat_data_sql)
+        conn.commit()
+
+    def _clear_flat(self, conn):
+        cursor = conn.cursor()
+        clear_sql = "DELETE FROM app_beers_flat"
+        cursor.execute(clear_sql)
+        conn.commit()
+
+    def _update_flat(self, conn):
+        custom_logger.log("update flat")
+        published_brewerys = self._get_published_brewerys(conn)
+        flat_brewerys = self._get_flat_brewerys(conn)
+        #get all published brewery name's from app_brewery and compare to app_beers_flat brewerys name's
 
     def _proccess_brewery(self, conn, brewery_name):
-        custom_logger.log("Proccess {0}".format(brewery_name))
         brewery_data = self._get_brewery_data(conn, brewery_name)
         self._add_brewery_data(conn, brewery_data)
 
@@ -64,6 +93,7 @@ class BeersFlatManager:
         cursor.execute(all_brewerys_select)
         records = dictfetchall(cursor)
         custom_logger.log("Fetch all published brewery: {0}".format(len(records)))
+        custom_logger.log("Working...")
         return records
 
     def _is_flat_empty(self, conn):
